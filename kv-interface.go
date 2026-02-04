@@ -1,4 +1,4 @@
-package main
+package db0101
 
 import "errors"
 
