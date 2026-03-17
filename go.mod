@@ -1,3 +1,3 @@
-module github.com/moroii69/copia
+module github.com/ufraaan/copia
 
 go 1.25.5
