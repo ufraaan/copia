@@ -3,6 +3,7 @@ package copia
 import (
 	"bytes"
 	"errors"
+	"os"
 	"sort"
 	"strings"
 	"sync"
@@ -11,14 +12,37 @@ import (
 var ErrNotOpen = errors.New("copia: store is not open")
 
 type KV struct {
-	mu  sync.RWMutex
-	mem map[string][]byte
+	mu     sync.RWMutex
+	mem    map[string][]byte
+	wal    *os.File
+	walErr error
 }
 
 func (kv *KV) Open() error {
 	kv.mu.Lock()
 	defer kv.mu.Unlock()
+	if err := kv.closeWAL(); err != nil {
+		return err
+	}
 	kv.mem = map[string][]byte{}
+	kv.walErr = nil
+	return nil
+}
+
+func (kv *KV) OpenFile(path string) error {
+	kv.mu.Lock()
+	defer kv.mu.Unlock()
+	if err := kv.closeWAL(); err != nil {
+		return err
+	}
+	file, mem, err := openWAL(path)
+	if err != nil {
+		kv.mem = nil
+		return err
+	}
+	kv.wal = file
+	kv.mem = mem
+	kv.walErr = nil
 	return nil
 }
 
@@ -26,11 +50,22 @@ func (kv *KV) Close() error {
 	kv.mu.Lock()
 	defer kv.mu.Unlock()
 	kv.mem = nil
-	return nil
+	return kv.closeWAL()
+}
+
+func (kv *KV) closeWAL() error {
+	if kv.wal == nil {
+		return nil
+	}
+	syncErr := kv.wal.Sync()
+	closeErr := kv.wal.Close()
+	kv.wal = nil
+	kv.walErr = nil
+	return errors.Join(syncErr, closeErr)
 }
 
 func (kv *KV) Get(key []byte) (val []byte, ok bool, err error) {
-	// only need a read lock here,stored bytes never escape directly
+	// a read lock is enough because returned values are copied.
 	kv.mu.RLock()
 	defer kv.mu.RUnlock()
 	if kv.mem == nil {
@@ -46,6 +81,9 @@ func (kv *KV) Set(key, val []byte) (updated bool, err error) {
 	if kv.mem == nil {
 		return false, ErrNotOpen
 	}
+	if err := kv.appendWAL(walSet, key, val); err != nil {
+		return false, err
+	}
 	kv.mem[string(key)] = clone(val)
 	return true, nil
 }
@@ -57,6 +95,12 @@ func (kv *KV) Del(key []byte) (deleted bool, err error) {
 		return false, ErrNotOpen
 	}
 	_, exists := kv.mem[string(key)]
+	if !exists {
+		return false, nil
+	}
+	if err := kv.appendWAL(walDel, key, nil); err != nil {
+		return false, err
+	}
 	delete(kv.mem, string(key))
 	return exists, nil
 }
@@ -71,10 +115,14 @@ func (kv *KV) Rename(oldKey, newKey []byte) (renamed bool, err error) {
 	if !ok {
 		return false, nil
 	}
-	kv.mem[string(newKey)] = value
-	if string(oldKey) != string(newKey) {
-		delete(kv.mem, string(oldKey))
+	if string(oldKey) == string(newKey) {
+		return true, nil
 	}
+	if err := kv.appendWAL(walRename, oldKey, newKey); err != nil {
+		return false, err
+	}
+	kv.mem[string(newKey)] = value
+	delete(kv.mem, string(oldKey))
 	return true, nil
 }
 
@@ -87,6 +135,12 @@ func (kv *KV) Copy(sourceKey, targetKey []byte) (copied bool, err error) {
 	value, ok := kv.mem[string(sourceKey)]
 	if !ok {
 		return false, nil
+	}
+	if string(sourceKey) == string(targetKey) {
+		return true, nil
+	}
+	if err := kv.appendWAL(walCopy, sourceKey, targetKey); err != nil {
+		return false, err
 	}
 	kv.mem[string(targetKey)] = clone(value)
 	return true, nil
@@ -114,7 +168,7 @@ func (kv *KV) Keys(prefix []byte) ([][]byte, error) {
 			keys = append(keys, []byte(key))
 		}
 	}
-	// map order,so sort before returning a stable list
+	// map order is random, so sort before returning a stable list.
 	sort.Slice(keys, func(i, j int) bool { return bytes.Compare(keys[i], keys[j]) < 0 })
 	return keys, nil
 }
@@ -133,6 +187,12 @@ func (kv *KV) Clear() error {
 	defer kv.mu.Unlock()
 	if kv.mem == nil {
 		return ErrNotOpen
+	}
+	if len(kv.mem) == 0 {
+		return nil
+	}
+	if err := kv.appendWAL(walClear, nil, nil); err != nil {
+		return err
 	}
 	kv.mem = map[string][]byte{}
 	return nil

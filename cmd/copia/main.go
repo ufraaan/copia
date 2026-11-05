@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"flag"
 	"fmt"
 	"os"
 	"strings"
@@ -10,8 +11,17 @@ import (
 )
 
 func main() {
+	walPath := flag.String("file", "", "path to the wal file")
+	flag.Parse()
+
 	var db copia.KV
-	if err := db.Open(); err != nil {
+	var err error
+	if *walPath == "" {
+		err = db.Open()
+	} else {
+		err = db.OpenFile(*walPath)
+	}
+	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}

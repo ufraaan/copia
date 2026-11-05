@@ -2,7 +2,6 @@ package copia
 
 import (
 	"encoding/binary"
-	"errors"
 	"io"
 )
 
@@ -27,10 +26,9 @@ func (ent *Entry) Decode(r io.Reader) error {
 	}
 	klen := uint64(binary.LittleEndian.Uint32(header[:4]))
 	vlen := uint64(binary.LittleEndian.Uint32(header[4:8]))
-	const maxRecordSize = 64 << 20
 	// lengths come from the input, so cap them before allocating
 	if klen+vlen > maxRecordSize {
-		return errors.New("copia: entry exceeds maximum size")
+		return ErrRecordTooLarge
 	}
 	data := make([]byte, int(klen+vlen))
 	if _, err := io.ReadFull(r, data); err != nil {
