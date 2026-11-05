@@ -1,4 +1,8 @@
-# copia
+<p align="center">
+  <img src="assets/logo.webp" width="96" alt="copia logo">
+</p>
+
+<h2 align="center">copia</h2>
 
 copia is a key/value store written in go. it can keep data in memory or record
 changes in a write-ahead log.
