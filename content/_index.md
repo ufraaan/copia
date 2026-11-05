@@ -1,5 +1,5 @@
 ---
-title: Copia
+title: Home
 description: A small key/value store written in Go.
 ---
 
