@@ -8,5 +8,6 @@ theme = 'hugo-book'
   BookSection = 'docs'
   BookRepo = 'https://github.com/ufraaan/copia'
   BookLogo = 'images/logo.webp'
+  BookFavicon = 'favicon.png'
   BookSearch = true
   BookToC = true
