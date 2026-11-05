@@ -11,3 +11,10 @@ theme = 'hugo-book'
   BookFavicon = 'favicon.png'
   BookSearch = true
   BookToC = true
+
+[[menu.after]]
+  name = 'GitHub'
+  url = 'https://github.com/ufraaan/copia'
+  weight = 10
+  [menu.after.params]
+    BookIcon = 'github'
