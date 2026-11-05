@@ -1,4 +1,4 @@
-baseURL = 'https://example.org/'
+baseURL = 'https://copia.ufraan.dev/'
 languageCode = 'en-us'
 title = 'Copia'
 theme = 'hugo-book'
