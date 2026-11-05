@@ -38,6 +38,10 @@ commands:
 - `cmd/copia` contains the command-line interface.
 - `internal/copia` contains the key/value store and entry encoding.
 
+## documentation site
+
+The project documentation is a Hugo site in `content/`, configured in `hugo.toml`, and uses the Hugo Book theme.
+
 ## store usage
 
 ```go

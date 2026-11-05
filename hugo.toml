@@ -1,0 +1,12 @@
+baseURL = 'https://example.org/'
+languageCode = 'en-us'
+title = 'Copia'
+theme = 'hugo-book'
+
+[params]
+  BookTheme = 'light'
+  BookSection = 'docs'
+  BookRepo = 'https://github.com/ufraaan/copia'
+  BookLogo = 'images/logo.webp'
+  BookSearch = true
+  BookToC = true
