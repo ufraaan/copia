@@ -13,6 +13,7 @@ Choose an operation for details:
 
 - [Open and close](open-close/)
 - [Set](set/)
+- [Set many values](set-many/)
 - [Get](get/)
 - [Delete](delete/)
 - [Rename](rename/)
