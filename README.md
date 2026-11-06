@@ -1,4 +1,4 @@
-<h2 align="center"><img src="assets/logo.webp" width="96" alt="copia logo"><br>copia</h2>
+<h2 align="center"><img src="assets/logo.webp" width="144" alt="copia logo"><br>copia</h2>
 
 copia is a key/value store written in go. it can keep data in memory or record
 changes in a write-ahead log.
@@ -65,5 +65,3 @@ WAL, the batch is written and synced as one checksummed record, so replay
 applies the whole batch or skips an incomplete or invalid record. Batch records
 are limited to 64 MiB.
 
-> [!NOTE]
-> Copia is <mark>work in progress</mark>.
