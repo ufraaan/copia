@@ -1,0 +1,28 @@
+baseURL = 'https://copia.ufraan.dev/'
+languageCode = 'en-us'
+enableRobotsTXT = true
+title = 'Copia'
+theme = 'hugo-book'
+
+[params]
+  BookTheme = 'light'
+  BookSection = 'docs'
+  BookRepo = 'https://github.com/ufraaan/copia'
+  BookLogo = 'images/logo.webp'
+  BookFavicon = 'favicon.png'
+  BookSearch = true
+  BookToC = true
+
+[[menu.after]]
+  name = 'GitHub'
+  url = 'https://github.com/ufraaan/copia'
+  weight = 10
+  [menu.after.params]
+    BookIcon = 'github'
+
+[sitemap]
+  changeFreq = 'weekly'
+  priority = 0.5
+
+[outputs]
+  home = ['html', 'rss', 'sitemap']

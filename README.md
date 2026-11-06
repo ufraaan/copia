@@ -1,13 +1,9 @@
-<p align="center">
-  <img src="assets/logo.webp" width="96" alt="copia logo">
-</p>
-
-<h2 align="center">copia</h2>
+<h2 align="center"><img src="assets/logo.webp" width="96" alt="copia logo"><br>copia</h2>
 
 copia is a key/value store written in go. it can keep data in memory or record
 changes in a write-ahead log.
 
-## run
+### run
 
 ```sh
 go run ./cmd/copia
@@ -33,12 +29,12 @@ commands:
 - `help`
 - `quit`
 
-## package layout
+### package layout
 
 - `cmd/copia` contains the command-line interface.
 - `internal/copia` contains the key/value store and entry encoding.
 
-## store usage
+### store usage
 
 ```go
 var db copia.KV
@@ -55,8 +51,19 @@ value, found, err := db.Get([]byte("key"))
 `OpenFile(path)` to replay and append to a write-ahead log. Operations before
 opening or after closing return `copia.ErrNotOpen`.
 
-## entry format
+Use `SetMany` to write several key/value pairs in one batch:
 
-Entries contain two little-endian `uint32` lengths, followed by the key and
-value bytes. `Entry.Decode` rejects records larger than 64 MiB. The wal stores
-each operation with a checksum and syncs it before changing the in-memory data.
+```go
+err := db.SetMany([]copia.Entry{
+    {Key: []byte("user:1"), Value: []byte("ada")},
+    {Key: []byte("user:2"), Value: []byte("grace")},
+})
+```
+
+`SetMany` copies its keys and values. Repeated keys keep the last value. With a
+WAL, the batch is written and synced as one checksummed record, so replay
+applies the whole batch or skips an incomplete or invalid record. Batch records
+are limited to 64 MiB.
+
+> [!NOTE]
+> Copia is <mark>work in progress</mark>.

@@ -88,6 +88,32 @@ func (kv *KV) Set(key, val []byte) (updated bool, err error) {
 	return true, nil
 }
 
+//writes a group of entries together
+func (kv *KV) SetMany(entries []Entry) error {
+	kv.mu.Lock()
+	defer kv.mu.Unlock()
+	if kv.mem == nil {
+		return ErrNotOpen
+	}
+	if len(entries) == 0 {
+		return nil
+	}
+
+	payload, err := encodeSetBatch(entries)
+	if err != nil {
+		return err
+	}
+	//one wal record lets replay take the whole batch or skip it completely
+	if err := kv.appendWALPayload(payload); err != nil {
+		return err
+	}
+	//if a key repeats, the later entry replaces the earlier one
+	for _, entry := range entries {
+		kv.mem[string(entry.Key)] = clone(entry.Value)
+	}
+	return nil
+}
+
 func (kv *KV) Del(key []byte) (deleted bool, err error) {
 	kv.mu.Lock()
 	defer kv.mu.Unlock()

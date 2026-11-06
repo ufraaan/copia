@@ -23,6 +23,7 @@ const (
 	walRename
 	walCopy
 	walClear
+	walSetBatch
 )
 
 var ErrRecordTooLarge = errors.New("copia: entry exceeds maximum size")
@@ -94,6 +95,7 @@ func replayWAL(file *os.File) (map[string][]byte, int64, error) {
 	}
 	return mem, offset, nil
 }
+
 //todo- log compaction when replaying the full history starts to drag (need to refer https://riak.com/assets/bitcask-intro.pdf)
 
 func applyWAL(mem map[string][]byte, payload []byte) error {
@@ -104,6 +106,9 @@ func applyWAL(mem map[string][]byte, payload []byte) error {
 		}
 		clear(mem)
 		return nil
+	}
+	if op == walSetBatch {
+		return applySetBatch(mem, payload[1:])
 	}
 	var entry Entry
 	r := bytes.NewReader(payload[1:])
@@ -140,18 +145,22 @@ func applyWAL(mem map[string][]byte, payload []byte) error {
 }
 
 func (kv *KV) appendWAL(op byte, key, value []byte) error {
-	if kv.wal == nil {
-		return nil
-	}
-	if kv.walErr != nil {
-		return kv.walErr
-	}
 	payload := []byte{op}
 	if op != walClear {
 		if uint64(len(key))+uint64(len(value)) > maxRecordSize {
 			return ErrRecordTooLarge
 		}
 		payload = append(payload, (Entry{Key: key, Value: value}).Encode()...)
+	}
+	return kv.appendWALPayload(payload)
+}
+
+func (kv *KV) appendWALPayload(payload []byte) error {
+	if kv.wal == nil {
+		return nil
+	}
+	if kv.walErr != nil {
+		return kv.walErr
 	}
 	var header [walHeaderSize]byte
 	copy(header[:4], walMagic[:])
@@ -170,6 +179,61 @@ func (kv *KV) appendWAL(op byte, key, value []byte) error {
 	if err := kv.wal.Sync(); err != nil {
 		kv.walErr = err
 		return err
+	}
+	return nil
+}
+
+func encodeSetBatch(entries []Entry) ([]byte, error) {
+	if uint64(len(entries)) > uint64(^uint32(0)) {
+		return nil, ErrRecordTooLarge
+	}
+	// the batch header takes a few bytes so room for dat
+	const batchHeaderSize = 5
+	var size uint64 = batchHeaderSize
+	for _, entry := range entries {
+		if uint64(len(entry.Key))+uint64(len(entry.Value)) > maxRecordSize {
+			return nil, ErrRecordTooLarge
+		}
+		size += 8 + uint64(len(entry.Key)) + uint64(len(entry.Value))
+		if size > maxRecordSize+9 {
+			return nil, ErrRecordTooLarge
+		}
+	}
+	payload := make([]byte, int(size))
+	payload[0] = walSetBatch
+	binary.LittleEndian.PutUint32(payload[1:5], uint32(len(entries)))
+	offset := batchHeaderSize
+	for _, entry := range entries {
+		encoded := entry.Encode()
+		copy(payload[offset:], encoded)
+		offset += len(encoded)
+	}
+	return payload, nil
+}
+
+func applySetBatch(mem map[string][]byte, data []byte) error {
+	if len(data) < 4 {
+		return errors.New("batch record is missing entry count")
+	}
+	count := binary.LittleEndian.Uint32(data[:4])
+	data = data[4:]
+	if uint64(count)*8 > uint64(len(data)) {
+		return errors.New("batch record has invalid entry count")
+	}
+	entries := make([]Entry, 0, int(count))
+	r := bytes.NewReader(data)
+	for i := uint32(0); i < count; i++ {
+		var entry Entry
+		if err := entry.Decode(r); err != nil {
+			return err
+		}
+		entries = append(entries, entry)
+	}
+	if r.Len() != 0 {
+		return errors.New("batch record has trailing data")
+	}
+	for _, entry := range entries {
+		mem[string(entry.Key)] = clone(entry.Value)
 	}
 	return nil
 }
